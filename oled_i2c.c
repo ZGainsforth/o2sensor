@@ -12,6 +12,7 @@
 #include "hardware/i2c.h"
 #include "raspberry26x32.h"
 #include "oled_i2c.h"
+#include "font6x8/font6x8.h"
 
 /* Example code to talk to an SSD1306-based OLED display
 
@@ -117,6 +118,20 @@ void oled_send_buf(uint8_t buf[], int buflen) {
     free(temp_buf);
 }
 
+// Render a font at a given x,y coordinate (letter coordinate, not pixel.)
+// The font is 6x8 pixels.
+void oled_render_letter(int x, int y, char letter){
+
+    struct render_area letter_area = {start_col: x*6, end_col : x*6+6, start_page : y*8, end_page : y*8+8};
+    calc_render_area_buflen(&letter_area);
+
+    const uint8_t* pLetter = &(font6x8_ascii[(uint8_t)letter-9][0]); 
+
+    /* printf("writting letter %c %x %x\n", letter, letter, (uint8_t)letter); */
+
+    render(pLetter, &letter_area);
+}
+
 void oled_init() {
     // some of these commands are not strictly necessary as the reset
     // process defaults to some of these but they are shown here
@@ -215,8 +230,7 @@ int oldmain() {
     oled_init();
 
     // initialize render area for entire frame (128 pixels by 4 pages)
-    struct render_area frame_area = {start_col: 0, end_col : OLED_WIDTH - 1, start_page : 0, end_page : OLED_NUM_PAGES -
-                                                                                                        1};
+    struct render_area frame_area = {start_col: 0, end_col : OLED_WIDTH - 1, start_page : 0, end_page : OLED_NUM_PAGES - 1};
     calc_render_area_buflen(&frame_area);
 
     // zero the entire display

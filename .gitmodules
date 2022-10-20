@@ -1,0 +1,6 @@
+[submodule "raster-fonts"]
+	path = raster-fonts
+	url = https://www.github.com/idispatch/raster-fonts
+[submodule "font6x8"]
+	path = font6x8
+	url = https://www.github.com/fantasticmao/font6x8

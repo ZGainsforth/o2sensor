@@ -63,6 +63,7 @@ void oled_init();
 
 void render(uint8_t *buf, struct render_area *area);
 
+void oled_render_letter(int x, int y, char letter);
 
 
 
