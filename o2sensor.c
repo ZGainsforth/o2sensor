@@ -32,49 +32,22 @@ int main() {
 
     // run through the complete initialization process
     oled_init();
-
-    // initialize render area for entire frame (128 pixels by 4 pages)
-    struct render_area frame_area = {start_col: 0, end_col : OLED_WIDTH - 1, start_page : 0, end_page : OLED_NUM_PAGES - 1};
-    calc_render_area_buflen(&frame_area);
-
-    // zero the entire display
-    uint8_t buf[OLED_BUF_LEN];
-    fill(buf, 0x00);
-    render(buf, &frame_area);
-
-    /* struct render_area area = {start_col: 0, end_col : IMG_WIDTH - 1, start_page : 0, end_page : OLED_NUM_PAGES - 1}; */
-    /* calc_render_area_buflen(&area); */
-    /* render(raspberry26x32, &area); */
-
-    // The render areas are inclusive, and zero based.  i.e. 0-2 is three pixels.
-    struct render_area letter_area = {start_col: 4, end_col : 6, start_page : 1, end_page : 2};
-    calc_render_area_buflen(&letter_area);
-    static uint8_t lettera[] = { 0xAA, 0xff, 0xff, 0xff, 0xff, 0xAA};
-    /* static uint8_t lettera[] = { 0x00, 0xFF, 0xFF, 0xFF, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00}; */
-    /* render(lettera, &letter_area); */
+    oled_clear_display();
 
     while (1) {
         // 12-bit conversion, assume max value == ADC_VREF == 3.3 V
         const float conversion_factor = 3.3f / (1 << 12);
         uint16_t result = adc_read();
+        char display_str[100] = "\n";
+
+        // Send the ADC measurement to the serial port.
         printf("My raw value: 0x%03x, voltage: %f V\n", result, result * conversion_factor);
-        render(buf, &frame_area);
+
+        // Send the ADC measurement to the OLED.
+        sprintf(display_str, "ADC reading: 0x%03x.", result);
+        oled_render_string(0,0,display_str);
+        sprintf(display_str, "Voltage: %f V", result*conversion_factor);
+        oled_render_string(0,1,display_str);
         sleep_ms(1000);
-        /* oled_send_cmd(0xA5); // ignore RAM, all pixels on */
-        render(lettera, &letter_area);
-        oled_render_letter(0,0,'0');
-        oled_render_letter(1,0,'1');
-        oled_render_letter(2,0,'2');
-        oled_render_letter(3,0,'3');
-        oled_render_letter(4,0,'4');
-        oled_render_letter(5,0,'5');
-        oled_render_letter(6,0,'6');
-        oled_render_letter(7,0,'7');
-        oled_render_letter(8,0,'8');
-        oled_render_letter(9,0,'9');
-        sleep_ms(500);
-        /* render(raspberry26x32, &area); */
-        /* printf("Rendering %d bytes.\n", area.buflen); */
-        /* oled_send_cmd(0xA4); // go back to following RAM */
     }
 }

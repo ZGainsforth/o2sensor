@@ -63,7 +63,9 @@ void oled_init();
 
 void render(uint8_t *buf, struct render_area *area);
 
-void oled_render_letter(int x, int y, char letter);
+void oled_clear_display();
+void oled_render_letter(uint8_t x, uint8_t y, char letter);
+void oled_render_string(uint8_t x, uint8_t y, char* string);
 
 
 

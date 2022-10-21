@@ -120,16 +120,34 @@ void oled_send_buf(uint8_t buf[], int buflen) {
 
 // Render a font at a given x,y coordinate (letter coordinate, not pixel.)
 // The font is 6x8 pixels.
-void oled_render_letter(int x, int y, char letter){
-
-    struct render_area letter_area = {start_col: x*6, end_col : x*6+6, start_page : y*8, end_page : y*8+8};
+void oled_render_letter(uint8_t x, uint8_t y, char letter){
+    struct render_area letter_area = {start_col: x*6, end_col : x*6+6, start_page : y, end_page : y};
     calc_render_area_buflen(&letter_area);
 
-    const uint8_t* pLetter = &(font6x8_ascii[(uint8_t)letter-9][0]); 
+    const uint8_t* pLetter = &(font6x8_ascii[(uint8_t)letter][0]); 
 
-    /* printf("writting letter %c %x %x\n", letter, letter, (uint8_t)letter); */
+    render((uint8_t*)pLetter, &letter_area);
+}
 
-    render(pLetter, &letter_area);
+// Render a font at a given x,y coordinate (letter coordinate, not pixel.)
+// The font is 6x8 pixels.
+void oled_render_string(uint8_t x, uint8_t y, char* string){
+    int i;
+
+    for (i=0; i<strlen(string); i++){
+        oled_render_letter(x+i,y, string[i]);
+    }
+}
+
+void oled_clear_display(){
+    // initialize render area for entire frame (128 pixels by 4 pages)
+    struct render_area frame_area = {start_col: 0, end_col : OLED_WIDTH - 1, start_page : 0, end_page : OLED_NUM_PAGES - 1};
+    calc_render_area_buflen(&frame_area);
+
+    // zero the entire display
+    uint8_t buf[OLED_BUF_LEN];
+    fill(buf, 0x00);
+    render(buf, &frame_area);
 }
 
 void oled_init() {
