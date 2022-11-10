@@ -9,6 +9,7 @@
 #include "hardware/gpio.h"
 #include "hardware/adc.h"
 #include "oled_i2c.h"
+#include "bmp280_i2c.h"
 
 #define XISTOR_PIN 6 
 #define ZEROSEQUENCELENGTH 100
@@ -59,6 +60,8 @@ int main() {
     gpio_set_function(PICO_DEFAULT_I2C_SCL_PIN, GPIO_FUNC_I2C);
     gpio_pull_up(PICO_DEFAULT_I2C_SDA_PIN);
     gpio_pull_up(PICO_DEFAULT_I2C_SCL_PIN);
+    /* gpio_set_drive_strength(PICO_DEFAULT_I2C_SDA_PIN, GPIO_DRIVE_STRENGTH_4MA); */
+    /* gpio_set_drive_strength(PICO_DEFAULT_I2C_SCL_PIN, GPIO_DRIVE_STRENGTH_4MA); */
 
     printf("Initializing OLED display across I2C\n");
     // run through the complete initialization process
@@ -86,7 +89,25 @@ int main() {
 
     oled_clear_display();
 
+    // configure BMP280
+    bmp280_init();
+
+    // retrieve fixed compensation params
+    struct bmp280_calib_param params;
+    bmp280_get_calib_params(&params);
+
+    int32_t raw_temperature;
+    int32_t raw_pressure;
+    int32_t temperature;
+    int32_t pressure;
+
+    sleep_ms(250); // sleep so that data polling and register update don't collide
+
+    uint8_t current_display_line = 0;
+
     while (1) {
+
+        current_display_line = 0;
 
         // Read the ADC.
         result = adc_read();
@@ -96,12 +117,22 @@ int main() {
         printf("ADC reading: 0x%03x, Voltage: %0.3f V, O2 = %0.2f%%\n", result, voltage, O2pct);
 
         // Send the ADC measurement to the OLED.
-        sprintf(display_str, "ADC reading: 0x%03x", result);
-        oled_render_string(0,0,display_str);
+        /* sprintf(display_str, "ADC reading: 0x%03x", result); */
+        /* oled_render_string(0,current_display_line++,display_str); */
         sprintf(display_str, "Voltage: %0.3f V", voltage);
-        oled_render_string(0,1,display_str);
+        oled_render_string(0,current_display_line++,display_str);
         sprintf(display_str, "O2: %0.2f%%", O2pct);
-        oled_render_string(0,2,display_str);
+        oled_render_string(0,current_display_line++,display_str);
+
+        bmp280_read_raw(&raw_temperature, &raw_pressure); 
+        temperature = bmp280_convert_temp(raw_temperature, &params);
+        pressure = bmp280_convert_pressure(raw_pressure, raw_temperature, &params);
+        printf("Pressure = %.3f kPa\n", pressure / 1000.f);
+        printf("Temp. = %.2f C\n", temperature / 100.f);
+        sprintf(display_str, "Pressure = %.3f kPa\n", pressure / 1000.f);
+        oled_render_string(0,current_display_line++,display_str);
+        sprintf(display_str, "Temp. = %.2f C\n", temperature / 100.f);
+        oled_render_string(0,current_display_line++,display_str);
 
         // We read every second.
         sleep_ms(1000);
