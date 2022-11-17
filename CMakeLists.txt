@@ -27,7 +27,7 @@ pico_sdk_init()
 add_executable(o2sensor
         o2sensor.c
         oled_i2c.c
-        bmp280_i2c.c
+        bme280_i2c.c
         )
 
 # pull in common dependencies

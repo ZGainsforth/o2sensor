@@ -30,13 +30,17 @@
  */
 
  // device has default bus address of 0x76
-/* #define ADDR _u(0x76) */
-#define ADDR _u(0x77)
+#define ADDR _u(0x76)
+/* #define ADDR _u(0x77) */
 
 // hardware registers
 #define REG_CONFIG _u(0xF5)
 #define REG_CTRL_MEAS _u(0xF4)
+#define REG_CTRL_HUM _u(0xF2)
 #define REG_RESET _u(0xE0)
+
+#define REG_HUMIDITY_LSB _u(0xFE)
+#define REG_HUMIDITY_MSB _u(0xFD)
 
 #define REG_TEMP_XLSB _u(0xFC)
 #define REG_TEMP_LSB _u(0xFB)
@@ -71,11 +75,13 @@
 #define REG_DIG_P8_MSB _u(0x9D)
 #define REG_DIG_P9_LSB _u(0x9E)
 #define REG_DIG_P9_MSB _u(0x9F)
+#define REG_DIG_H1 _u(0xA1)
+#define REG_DIG_H2 _u(0xE1)
 
 // number of calibration registers to be read
 #define NUM_CALIB_PARAMS 24
 
-struct bmp280_calib_param {
+struct bme280_calib_param {
     // temperature params
     uint16_t dig_t1;
     int16_t dig_t2;
@@ -91,18 +97,28 @@ struct bmp280_calib_param {
     int16_t dig_p7;
     int16_t dig_p8;
     int16_t dig_p9;
+
+    // humidity params
+    uint8_t dig_h1;
+    int16_t dig_h2;
+    uint8_t dig_h3;
+    int16_t dig_h4;
+    int16_t dig_h5;
+    int8_t dig_h6;
 };
 
-void bmp280_init();
+void bme280_init();
 
-void bmp280_read_raw(int32_t* temp, int32_t* pressure);
+void bme280_read_raw(int32_t* temp, int32_t* pressure, int32_t* humidity);
 
-void bmp280_reset();
+void bme280_reset();
 
-int32_t bmp280_convert(int32_t temp, struct bmp280_calib_param* params);
+int32_t bme280_convert(int32_t temp, struct bme280_calib_param* params);
 
-int32_t bmp280_convert_temp(int32_t temp, struct bmp280_calib_param* params);
+int32_t bme280_convert_temp(int32_t temp, struct bme280_calib_param* params);
 
-int32_t bmp280_convert_pressure(int32_t pressure, int32_t temp, struct bmp280_calib_param* params);
+int32_t bme280_convert_pressure(int32_t pressure, int32_t temp, struct bme280_calib_param* params);
 
-void bmp280_get_calib_params(struct bmp280_calib_param* params);
+float bme280_convert_humidity(int32_t humidity, int32_t temp, struct bme280_calib_param* params);
+
+void bme280_get_calib_params(struct bme280_calib_param* params);
