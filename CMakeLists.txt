@@ -39,4 +39,4 @@ pico_add_extra_outputs(o2sensor)
 # add url via pico_set_program_url
 # example_auto_set_url(O2Sensor)
 
-target_link_libraries(o2sensor pico_stdlib hardware_adc hardware_i2c)
+target_link_libraries(o2sensor pico_stdlib hardware_adc hardware_i2c hardware_pwm)

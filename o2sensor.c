@@ -8,6 +8,7 @@
 #include "pico/stdlib.h"
 #include "hardware/gpio.h"
 #include "hardware/adc.h"
+#include "hardware/pwm.h"
 #include "oled_i2c.h"
 #include "bme280_i2c.h"
 #include <string.h>
@@ -16,7 +17,8 @@
 #define XISTOR_PIN 6 
 #define ADCSEQUENCELENGTH 60 
 #define VOLTSPERPERCENTO2 0.05  //This is the default for a SGX-40X -- tune the pot to make it perfect.
-#define BOOTUPSLEEP 1 // If 1 then we have several seconds of sleep time to get sensor stability when booting.  But 0 is better for debugging.
+#define BOOTUPSLEEP 0 // If 1 then we have several seconds of sleep time to get sensor stability when booting.  But 0 is better for debugging.
+#define PWMFREQ 400000 // Frequency for the PWM audio output.
 
 float mean(uint16_t* x, uint16_t lenx){
     uint16_t i;
@@ -27,6 +29,99 @@ float mean(uint16_t* x, uint16_t lenx){
     }
     meanval = meanval/lenx;
     return meanval;
+}
+
+void pwm_set_freq_duty(uint slice, uint channel, uint32_t freq, uint16_t duty){
+    // slice = the PWM slice.
+    // channel = the PWM channel.
+    // freq = the desired PWM frequency in Hz.
+    // duty = The desired duty cycle in per mil (1/1000)
+
+    // This is the default clock speed on pi pico, div/2 because we have two clocks per PWM cycle.
+    uint32_t clock = 125000000/2; 
+
+    // For now the minimum frequency is 1 kHz.  We can do lower by dividing the sys clock but don't need that now.
+    if(freq < 1000){
+        freq = 1000;
+    }
+    // Can't have frequency higher than the clock.
+    if(freq > clock){
+        freq = clock;
+    }
+
+    // Maximum duty is 1000 per mil.
+    if(duty > 1000){
+        duty = 1000;
+    }
+
+    // The wrap is the number of clock ticks in one period.  We round to the nearest integer.
+    uint16_t wrap = (uint16_t)round(clock / freq);
+    /* printf("Wrap value: %d", wrap); */
+
+    uint16_t dutyticks = (uint16_t)round(wrap*duty/1000);
+    /* printf("Duty value: %d", dutyticks); */
+
+    pwm_set_wrap(slice, wrap);
+    pwm_set_chan_level(slice, channel,dutyticks);
+
+    return;
+}
+
+/* #define STEPMICROSECS 100 */
+/* #define WAITMICROSECS 78 */
+
+#define STEPMICROSECS 25
+#define WAITMICROSECS 3
+#define DIODEDROP 0.212
+
+/* // When outputting audio, it goes from 0-3.3 V which means the middle of the sine wave is 1.5V.  However, an audio alarm is rare. */
+/* // To save power, we leave the PWM off when not using the audio */ 
+/* void generate_ramp(uint slice, uint channel, uint32_t pwm_freq, uint32_t ms, uint8_t polarity){ */
+/*     uint32_t num_steps = ms*1000/STEPMICROSECS; */
+/*     uint32_t i = 0; // loop counter. */
+/*     float A = 0; // Amplitude of the ramp. */
+/* } */
+
+void generate_tone(uint slice, uint channel, uint32_t pwm_freq, uint32_t audio_freq, uint32_t ms, uint8_t end_int_wavelength){
+    // We assume the PWM frequency is >> than the audio_frequency.
+    // It takes about 200 us for this function to run.
+    uint32_t num_steps = ms*1000/STEPMICROSECS;
+    /* printf("num_steps: %d\n", num_steps); */
+    uint32_t i = 0; // loop counter.
+    float t = 0; // time in seconds at current counter in loop.
+    float A = 0; // Amplitude of the sine wave.
+    float lastA = 0; // Amplitude of the sine wave at the last sample (checks for sample crossing).
+
+    for(i=0; 1; i++){
+        // convert to an absolute time.
+        t = (float)(i * STEPMICROSECS) / 1000000;
+        // Calculate the amplitude of the sine wave at the current time.
+        A = sin(2*3.14159*audio_freq*t);
+        // We want unity swing
+        A /= 2;
+        // Also reduce amplitude by one diode drop to accomodate the transistor in the amp on the output.
+        /* A *= (1-DIODEDROP*2); */
+        // And now shift it so it is at the "midpoint" between DIODEDROP and 1.
+        A += 0.5;// + DIODEDROP;
+        /* A = (sin(2*3.14159*audio_freq*t)*(1-DIODEDROP) + 1)/2; */
+        pwm_set_freq_duty(slice, channel, PWMFREQ, A*1000);
+        // Wait until the time slice is finished.
+        sleep_us(WAITMICROSECS);
+
+        // Loop end conditions.
+        if(i>=num_steps){
+            // Either wait to an end of a wavelength (sin phase = 2 pi = crossing the x axis in the positive direction.)
+            if(end_int_wavelength==1){
+                if((lastA < (0.5)) && (A >= (0.5))){
+                    break;
+                }
+            // Or just end when the time is up.
+            }else{
+                break;
+            }
+        }
+        lastA=A;
+    }
 }
 
 int main() {
@@ -69,6 +164,16 @@ int main() {
     gpio_init(XISTOR_PIN);
     gpio_set_dir(XISTOR_PIN, GPIO_OUT);
     gpio_pull_down(XISTOR_PIN); // Default to transistor off = sensor disconnected.
+
+    // Init PWM used for audio out when O2 goes out of range.
+    // GPIO 9 is Pi Pico pin 12.
+    gpio_set_function(7, GPIO_FUNC_PWM);
+    // Get the slice and channel for the pwm on this gpio.
+    uint slice = pwm_gpio_to_slice_num(7);
+    uint channel = pwm_gpio_to_channel(7);
+    // Set the frequency of the PWM to a value >> audio, and the duty cycle to 0 per mil.
+    pwm_set_freq_duty(slice, channel, PWMFREQ, 0);
+    pwm_set_enabled(slice, true);
 
     // Init the I2C which goes to the OLED and BME280.
     const uint32_t baudrate = 400000;
@@ -196,8 +301,22 @@ int main() {
         // Send the ADC measurement to the OLED.
         sprintf(display_str, "O2: %0.2f%%", O2pct);
         oled_render_string(0,current_display_line++,display_str);
-        // We read every second.
-        sleep_ms(1000);
+
+
+        // If the O2 sensor is out of bound then set off an alarm.
+        if(O2pct < 20.0){
+            for(i=0;i<100;i++){
+                generate_tone(slice, channel, PWMFREQ, 50+(i*10), 5, 1);
+            }
+            pwm_set_freq_duty(slice, channel, PWMFREQ, 500);
+            // We read every second.
+            sleep_ms(500);
+        }else{
+            // We read every second.
+            sleep_ms(1000);
+            // Deactivate the audio out.
+            pwm_set_freq_duty(slice, channel, PWMFREQ, 0);
+        }
 
     }
 }
