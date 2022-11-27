@@ -15,6 +15,7 @@
 #include <math.h>
 
 #define XISTOR_PIN 6 
+#define PWM_PIN 9 
 #define ADCSEQUENCELENGTH 60 
 #define VOLTSPERPERCENTO2 0.05  //This is the default for a SGX-40X -- tune the pot to make it perfect.
 #define BOOTUPSLEEP 0 // If 1 then we have several seconds of sleep time to get sensor stability when booting.  But 0 is better for debugging.
@@ -167,10 +168,10 @@ int main() {
 
     // Init PWM used for audio out when O2 goes out of range.
     // GPIO 9 is Pi Pico pin 12.
-    gpio_set_function(7, GPIO_FUNC_PWM);
+    gpio_set_function(PWM_PIN, GPIO_FUNC_PWM);
     // Get the slice and channel for the pwm on this gpio.
-    uint slice = pwm_gpio_to_slice_num(7);
-    uint channel = pwm_gpio_to_channel(7);
+    uint slice = pwm_gpio_to_slice_num(PWM_PIN);
+    uint channel = pwm_gpio_to_channel(PWM_PIN);
     // Set the frequency of the PWM to a value >> audio, and the duty cycle to 0 per mil.
     pwm_set_freq_duty(slice, channel, PWMFREQ, 0);
     pwm_set_enabled(slice, true);
