@@ -306,8 +306,8 @@ int main() {
 
         // If the O2 sensor is out of bound then set off an alarm.
         if(O2pct < 20.0){
-            for(i=0;i<100;i++){
-                generate_tone(slice, channel, PWMFREQ, 50+(i*10), 5, 1);
+            for(i=0;i<500;i++){
+                generate_tone(slice, channel, PWMFREQ, 50+(i*10), 1, 1);
             }
             pwm_set_freq_duty(slice, channel, PWMFREQ, 500);
             // We read every second.
